@@ -1,0 +1,74 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment to deploy to
+        required: true
+        type: choice
+        default: dev
+        options:
+          - dev
+          - staging
+          - demo
+          - prod
+      releaseVersion:
+        description: The release version to deploy
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+run-name: Deploy ${{ inputs.releaseVersion }} to ${{ inputs.environment }} by @${{ github.actor }}
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repo Release Tag
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.releaseVersion }}
+
+      - name: Setup Node.js and install dependencies
+        uses: LeafLink/ci-tools/setup-node-and-install@main
+
+      - name: Build Release Assets
+        env:
+          VITE_RELEASE_VERSION: ${{ inputs.releaseVersion }}
+        run: |
+          npm run build -- --mode ${{ inputs.environment }}
+
+      - name: Determine AWS Account
+        uses: dkershner6/switch-case-action@v1
+        id: aws-account-id
+        with:
+          default: 178085756123
+          conditionals-with-values: |
+            ${{ inputs.environment == 'dev' }} => 178085756123
+            ${{ inputs.environment == 'staging' }} => 383648987819
+            ${{ inputs.environment == 'demo' }} => 642296112925
+            ${{ inputs.environment == 'prod' }} => 642296112925
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume:
+            arn:aws:iam::${{ steps.aws-account-id.outputs.value }}:role/<%= vueAppName %>-web-s3-access-github-actions-role-${{ inputs.environment }}
+          aws-region: us-west-2
+
+      - name: Upload Release Assets to S3
+        run: |
+          aws s3 cp ./dist/index.html s3://leaflink-<%= vueAppName %>-web-${{ inputs.environment }}/deliveries/ \
+            --cache-control public,max-age=60
+          aws s3 cp --recursive ./dist/ s3://leaflink-<%= vueAppName %>-web-${{ inputs.environment }}/deliveries/ \
+            --cache-control public,max-age=31536000,immutable \
+            --exclude index.html

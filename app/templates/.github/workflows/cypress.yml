@@ -1,0 +1,67 @@
+name: Cypress E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: Test environment
+        required: false
+        default: dev
+        options:
+          - dev
+          - staging
+      tags:
+        description: Scenario tags
+        default: '@e2e'
+      browser:
+        type: choice
+        description: Browser
+        required: false
+        default: chrome
+        options:
+          - chrome
+          - firefox
+          - electron
+      base_url:
+        type: string
+        description: Set a custom baseUrl
+        required: false
+
+jobs:
+  cypress:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js and install dependencies
+        uses: LeafLink/ci-tools/setup-node-and-install@main
+
+      # Helpful for troubleshooting, i.e. seeing what is set in github.event.inputs
+      - name: Dump Github Event context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github.event) }}
+        run: echo "$GITHUB_CONTEXT"
+
+      - name: Run E2E tests against the PR environment
+        uses: cypress-io/github-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONFIG_FILE: ${{ github.event.inputs.environment }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          CYPRESS_servicerPassword: ${{ secrets.SERVICER_PASSWORD }}
+          CYPRESS_BASE_URL: ${{ github.event.inputs.base_url }}
+        with:
+          record: true
+          browser: ${{ github.event.inputs.browser }}
+          tag: ${{ github.event.inputs.tags }}
+
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: html_report
+          path: cypress/reports
+          retention-days: 10

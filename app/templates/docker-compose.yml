@@ -1,0 +1,42 @@
+version: '3.7'
+
+services:
+  web:
+    container_name: llp.<%= vueAppName %>-web
+    build:
+      context: .
+      target: base
+    command: [npm, run, dev, --, --host]
+    volumes:
+      - ./src:/var/www/src:delegated
+      - ./public:/var/www/public:delegated
+      - ./.env:/var/www/.env:delegated
+      - ./.env.local:/var/www/.env.local:delegated
+      - ./index.html:/var/www/index.html:delegated
+    ports:
+      - '5174:5174'
+    networks:
+      - llp_network
+
+  api:
+    container_name: llp.<%= vueAppName %>-api
+    image: codfish/json-server:0.17.3
+    command: npm run dev
+    ports:
+      - '9999:80'
+    volumes:
+      - ./api/db.ts:/app/db.ts:delegated
+      - ./api/middleware.ts:/app/middleware.ts:delegated
+      - ./api/users.ts:/app/users.ts:delegated
+      - ./api/seed.ts:/app/seed.ts:delegated
+      - ./api/routes.json:/app/routes.json:delegated
+      - ./src/models:/app/models:delegated
+      - ./src/constants.ts:/app/constants.ts:delegated
+    environment:
+      VIRTUAL_HOST: mock-marketplace.docker
+      FKS: _id
+      DELAY: 200
+
+networks:
+  llp_network:
+    external: true

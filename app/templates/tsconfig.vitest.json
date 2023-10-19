@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "exclude": ["api"],
+  "include": ["src/**/*", "tests/**/*", "__mocks__"],
+  "compilerOptions": {
+    "composite": true,
+    "lib": [],
+    "types": ["node", "jsdom", "vitest/globals", "@testing-library/jest-dom"]
+  }
+}

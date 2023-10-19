@@ -1,0 +1,41 @@
+name: PR Quality Checks
+
+on:
+  pull_request:
+  # run on push to main branch too for codecov
+  push:
+    branches:
+      - main
+
+jobs:
+  quality-checks:
+    runs-on: self-hosted
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: leaflink/setup-ga-environment-action@main
+
+      - name: Setup Node.js and install dependencies
+        uses: LeafLink/ci-tools/setup-node-and-install@main
+
+      - name: Lint commit messages
+        run: npm run lint:commits -- --from="origin/${{ github.base_ref }}" --to="origin/${{github.head_ref }}"
+        if: github.event_name == 'pull_request'
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Test code
+        run: npm run validate
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

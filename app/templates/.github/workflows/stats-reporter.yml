@@ -1,0 +1,90 @@
+name: Stats Reporter
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - package.json
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  main:
+    name: Report Stats
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Rename File
+        run: mv stats.json pr-stats.json
+
+      # https://github.com/actions/download-artifact/issues/3
+      - name: Retrieve latest bundle stats
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          github_token: ${{secrets.GITHUB_TOKEN}}
+          name: bundle-size-stats
+          workflow: stats-uploader.yml
+
+      - name: Format Main Bundle Stats
+        id: main-bundle
+        run: |
+          SIZE=$(jq '[.. | objects | .renderedLength] | add' stats.json)
+          FORMATTED=$(numfmt --to=iec-i --suffix=B --format="%9.2f" $SIZE )
+
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "formatted=$FORMATTED" >> "$GITHUB_OUTPUT"
+
+      - name: Format PR Bundle Stats
+        id: pr-bundle
+        run: |
+          SIZE=$(jq '[.. | objects | .renderedLength] | add' pr-stats.json)
+          FORMATTED=$(numfmt --to=iec-i --suffix=B --format="%9.2f" $SIZE )
+
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "formatted=$FORMATTED" >> "$GITHUB_OUTPUT"
+
+      - name: Diff PR From Main
+        id: diff
+        run: |
+          SIZE=$(( ${{ steps.pr-bundle.outputs.size }} - ${{ steps.main-bundle.outputs.size }}  ))
+          echo "$SIZE"
+
+          if [ $SIZE -eq 0 ]; then
+            FORMATTED="--"
+          elif [ $SIZE -gt 0 ]; then
+            FORMATTED=+$(numfmt --to=iec-i --suffix=B --format="%9.2f" $SIZE )
+          else
+            FORMATTED=-$(numfmt --to=iec-i --suffix=B --format="%9.2f" $(($SIZE * -1)) )
+          fi
+
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "formatted=$FORMATTED" >> "$GITHUB_OUTPUT"
+
+      - name: Comment Bundle Stats Update
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            ### 📦 Bundle Stats Update
+            | main | PR | diff from `main` |
+            | -- | -- | -- |
+            | ${{ steps.main-bundle.outputs.formatted }} | ${{ steps.pr-bundle.outputs.formatted }} | ${{ steps.diff.outputs.formatted }} |
+          mode: upsert
+          comment_tag: stats

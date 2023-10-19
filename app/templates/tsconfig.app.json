@@ -1,0 +1,20 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "include": ["src/**/*", "src/**/*.vue"],
+  "exclude": ["dist", "src/**/__tests__/*", "src/**/*.spec.ts"],
+  "compilerOptions": {
+    "allowJs": true,
+    "baseUrl": ".",
+    "composite": true,
+    "preserveValueImports": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@tests/*": ["./tests/*"],
+      "@api/*": ["./api/*"]
+    },
+    "types": ["gtag.js", "segment-analytics"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "strict": false,
+    "verbatimModuleSyntax": false
+  }
+}

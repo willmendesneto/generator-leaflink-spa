@@ -1,0 +1,12 @@
+{
+  "include": ["api/*"],
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "./fixtures/*": ["./tests/fixtures/*"],
+    },
+    "module": "commonjs", /* Specify what module code is generated. */
+    "target": "es5", /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
+    "esModuleInterop": true,
+  }
+}

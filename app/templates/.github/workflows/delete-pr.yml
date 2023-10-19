@@ -1,0 +1,58 @@
+name: Delete PR Environment
+
+on:
+  pull_request:
+    types: closed
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  PR_NUMBER: ${{ github.event.number }}
+
+jobs:
+  delete-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # This should be updated to a leaflink-devops account role that has access
+      # to all the <%= vueAppName %> buckets (dev, staging, demo, and prod)
+      # the dev bucket will hold pr and dev environments
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::178085756123:role/<%= vueAppName %>-s3-access-github-actions-role
+          aws-region: us-west-2
+
+      - name: Delete Route53 Record
+        run: |
+          aws route53 change-resource-record-sets \
+            --hosted-zone-id /hostedzone/Z005865730GD7RH4Z5HK \
+            --change-batch '
+            {
+              "Comment": "Delete a record set for pr endpoint",
+              "Changes": [{
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                  "Name": "'"<%= vueAppName %>-${{ env.PR_NUMBER }}.dev.leaflink.io"'",
+                  "Type": "A",
+                  "AliasTarget": {
+                    "HostedZoneId": "Z2FDTNDATAQYW2",
+                    "DNSName": "d1c3h4fpp9cbkz.cloudfront.net",
+                    "EvaluateTargetHealth": false
+                  }
+                }
+              }]
+            }'
+
+      - name: Delete PR Assets in S3
+        run: |
+          aws s3 rm --recursive s3://leaflink-<%= vueAppName %>-dev/prs/${{ env.PR_NUMBER }}/

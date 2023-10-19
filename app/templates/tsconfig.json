@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "types": [
+      "node",
+      "@testing-library/cypress",
+      "cypress",
+      "vitest/globals",
+    ]
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.config.json"
+    },
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.vitest.json"
+    },
+    {
+      "path": "./tsconfig.api.json"
+    }
+  ]
+}

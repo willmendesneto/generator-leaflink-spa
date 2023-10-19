@@ -1,0 +1,5 @@
+{
+  "generator-leaflink-spa": {
+    "version": "<%= generatorVersion %>"
+  }
+}

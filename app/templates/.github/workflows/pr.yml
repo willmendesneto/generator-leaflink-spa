@@ -1,0 +1,90 @@
+name: Create/Update PR Environment
+
+on:
+  pull_request_target:
+
+permissions:
+  id-token: write
+  contents: read
+  actions: write
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  PR_NUMBER: ${{ github.event.number }}
+
+jobs:
+  pr:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: PR Environment
+      url: https://<%= vueAppName %>-web-${{ env.PR_NUMBER }}.dev.leaflink.io/deliveries/
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # This should be updated to a leaflink-devops account role that has access
+      # to all the <%= vueAppName %>-web buckets (dev, staging, demo, and prod)
+      # the dev bucket will hold pr and dev environments
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::178085756123:role/<%= vueAppName %>-web-s3-access-github-actions-role-dev
+          aws-region: us-west-2
+
+      # UPSERT makes this idempotent so it's fine if it runs every time
+      # Pull ids out as environment variables
+      - name: Create Route53 Record
+        run: |
+          aws route53 change-resource-record-sets \
+            --hosted-zone-id /hostedzone/Z005865730GD7RH4Z5HK \
+            --change-batch '
+            {
+              "Comment": "Creating a record set for pr endpoint",
+              "Changes": [{
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "'"<%= vueAppName %>-web-${{ env.PR_NUMBER }}.dev.leaflink.io"'",
+                  "Type": "A",
+                  "AliasTarget": {
+                    "HostedZoneId": "Z2FDTNDATAQYW2",
+                    "DNSName": "dc556gda3unhr.cloudfront.net",
+                    "EvaluateTargetHealth": false
+                  }
+                }
+              }]
+            }'
+      - name: Setup Node.js and install dependencies
+        uses: LeafLink/ci-tools/setup-node-and-install@main
+
+      - name: Build Release Assets
+        env:
+          VITE_RELEASE_VERSION: PR-${{ env.PR_NUMBER }}
+        run: |
+          npm run build -- --mode dev
+
+      - name: Upload Release Assets to S3
+        run: |
+          aws s3 cp ./dist/index.html s3://leaflink-<%= vueAppName %>-web-dev/deliveries/prs/${{ env.PR_NUMBER }}/ \
+            --cache-control public,max-age=60
+          aws s3 cp --recursive ./dist/ s3://leaflink-<%= vueAppName %>-web-dev/prs/${{ env.PR_NUMBER }}/deliveries/ \
+            --cache-control public,max-age=31536000,immutable \
+            --exclude index.html
+
+      - name: Run E2E tests against the PR environment
+        uses: cypress-io/github-action@v5
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONFIG_FILE: dev
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          CYPRESS_servicerPassword: ${{ secrets.SERVICER_PASSWORD }}
+          CYPRESS_BASE_URL: https://<%= vueAppName %>-web-${{ env.PR_NUMBER}}.dev.leaflink.io/deliveries
+        with:
+          record: true
+          browser: chrome
