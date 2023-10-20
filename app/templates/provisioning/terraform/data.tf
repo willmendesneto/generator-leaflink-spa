@@ -1,6 +1,6 @@
 data "aws_caller_identity" "current" {}
 
-data "aws_iam_policy_document" "<%= vueAppNameSnakeCase %>_bucket" {
+data "aws_iam_policy_document" "<%= vueAppName %>_bucket" {
   statement {
     actions = [
       "s3:Put*",
@@ -11,7 +11,7 @@ data "aws_iam_policy_document" "<%= vueAppNameSnakeCase %>_bucket" {
     effect = "Allow"
     principals {
       type        = "AWS"
-      identifiers = [module.<%= vueAppNameSnakeCase %>_oidc_role.role_arn]
+      identifiers = [module.<%= vueAppName %>_oidc_role.role_arn]
     }
     resources = [
       "${aws_s3_bucket.this.arn}/*",

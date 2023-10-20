@@ -31,5 +31,5 @@ resource "aws_s3_bucket_versioning" "this" {
 resource "aws_s3_bucket_policy" "this" {
   bucket = aws_s3_bucket.this.bucket
 
-  policy = data.aws_iam_policy_document.<%= vueAppNameSnakeCase %>_web_bucket.json
+  policy = data.aws_iam_policy_document.<%= vueAppName %>_web_bucket.json
 }
